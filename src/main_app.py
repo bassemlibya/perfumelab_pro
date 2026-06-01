@@ -26,8 +26,9 @@ class MainApplication(QApplication):
                 QMessageBox.critical(None, "خطأ", "فشل في تهيئة قاعدة البيانات!")
                 sys.exit(1)
             
+            # Theme Manager - تمرير QApplication
             self.theme_manager = ThemeManager()
-            self.theme_manager.apply_theme('light')  # تصحيح الخطأ
+            self.theme_manager.apply_theme('light', self)  # تمرير self (QApplication)
             
             # تهيئة مدير العملات مع معالجة الأخطاء
             try:
@@ -53,15 +54,17 @@ class MainApplication(QApplication):
     
     def run(self):
         try:
-            self.main_window = MainShell()
-            # تمرير مدير العملات إذا كان MainShell يدعمه
-            if hasattr(self.main_window, 'set_currency_manager'):
-                self.main_window.set_currency_manager(self.currency_manager)
-            
+            # تمرير المديرين إلى MainShell
+            self.main_window = MainShell(
+                db_manager=self.db_manager,
+                theme_manager=self.theme_manager,
+                currency_manager=self.currency_manager
+            )
             self.main_window.showMaximized()
             return self.exec()
         except Exception as e:
             print(f"خطأ في تشغيل التطبيق: {e}")
+            traceback.print_exc()
             return 1
 
 if __name__ == "__main__":
