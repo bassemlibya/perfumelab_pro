@@ -1,0 +1,26 @@
+{
+  "default_currency": "USD",
+  "supported_currencies": [
+    "USD",
+    "SAR",
+    "AED",
+    "EGP",
+    "EUR",
+    "KWD",
+    "QAR",
+    "BHD",
+    "OMR"
+  ],
+  "exchange_api": {
+    "enabled": false,
+    "provider": "open_exchange_rates",
+    "api_key": "",
+    "auto_update": true,
+    "update_interval_hours": 24
+  },
+  "formatting": {
+    "use_arabic_numerals": true,
+    "date_format": "YYYY-MM-DD",
+    "datetime_format": "YYYY-MM-DD HH:mm:ss"
+  }
+}
