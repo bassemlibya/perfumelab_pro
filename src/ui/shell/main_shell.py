@@ -26,13 +26,23 @@ try:
 except ImportError as e:
     print(f"تحذير: بعض الوحدات غير متوفرة - {e}")
     # إنشاء وحدات وهمية للتجربة
-    DashboardWidget = lambda: QLabel("Dashboard - قيد التطوير")
-    POSWindow = lambda: QLabel("POS - قيد التطوير")
-    InventoryWidget = lambda: QLabel("Inventory - قيد التطوير")
-    CustomersWidget = lambda: QLabel("Customers - قيد التطوير")
-    TreasuryWidget = lambda: QLabel("Treasury - قيد التطوير")
-    ManufacturingWidget = lambda: QLabel("Manufacturing - قيد التطوير")
-    ReportsWidget = lambda: QLabel("Reports - قيد التطوير")
+    class PlaceholderWidget(QWidget):
+        def __init__(self, name):
+            super().__init__()
+            layout = QVBoxLayout()
+            label = QLabel(f"⚠️ {name}\nقيد التطوير")
+            label.setAlignment(Qt.AlignCenter)
+            label.setStyleSheet("font-size: 18px; color: #999;")
+            layout.addWidget(label)
+            self.setLayout(layout)
+    
+    DashboardWidget = lambda: PlaceholderWidget("لوحة المعلومات")
+    POSWindow = lambda: PlaceholderWidget("نقطة البيع")
+    InventoryWidget = lambda: PlaceholderWidget("المخزون")
+    CustomersWidget = lambda: PlaceholderWidget("العملاء")
+    TreasuryWidget = lambda: PlaceholderWidget("الخزينة")
+    ManufacturingWidget = lambda: PlaceholderWidget("التصنيع")
+    ReportsWidget = lambda: PlaceholderWidget("التقارير")
 
 class MainShell(QMainWindow):
     """النافذة الرئيسية للنظام"""
@@ -60,7 +70,7 @@ class MainShell(QMainWindow):
         # إعداد المؤقتات والاتصالات
         self.setup_timers()
         
-        # تطبيق السمة الحالية
+        # تطبيق السمة الحالية (تصحيح: بدون تمرير app)
         self.apply_current_theme()
         
         # ربط إشارة الإغلاق
@@ -70,51 +80,55 @@ class MainShell(QMainWindow):
         """استعادة إعدادات النافذة من قاعدة البيانات"""
         try:
             # محاولة قراءة الإعدادات من قاعدة البيانات
-            if self.db_manager and self.db_manager.table_exists('settings'):
-                result = self.db_manager.execute_one(
-                    "SELECT setting_value FROM settings WHERE setting_key = ?",
-                    ('window_geometry',)
-                )
-                if result:
-                    geometry = result['setting_value']
-                    if geometry:
+            if self.db_manager:
+                # التحقق من وجود جدول settings
+                try:
+                    result = self.db_manager.execute_one(
+                        "SELECT setting_value FROM settings WHERE setting_key = ?",
+                        ('window_geometry',)
+                    )
+                    if result and result.get('setting_value'):
+                        geometry = result['setting_value']
                         self.restoreGeometry(QByteArray.fromHex(geometry.encode()))
-                
-                result = self.db_manager.execute_one(
-                    "SELECT setting_value FROM settings WHERE setting_key = ?",
-                    ('window_state',)
-                )
-                if result:
-                    state = result['setting_value']
-                    if state:
+                    
+                    result = self.db_manager.execute_one(
+                        "SELECT setting_value FROM settings WHERE setting_key = ?",
+                        ('window_state',)
+                    )
+                    if result and result.get('setting_value'):
+                        state = result['setting_value']
                         self.restoreState(QByteArray.fromHex(state.encode()))
+                except Exception as e:
+                    print(f"تحذير: جدول settings غير متوفر - {e}")
         except Exception as e:
             print(f"خطأ في استعادة إعدادات النافذة: {e}")
         
         # إذا لم تكن هناك إعدادات، استخدم الحجم الافتراضي
-        if not self.geometry().isEmpty():
-            return
-        
-        # الحصول على حجم الشاشة
-        screen = QApplication.primaryScreen().availableGeometry()
-        self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))
-        self.move((screen.width() - self.width()) // 2, 
-                  (screen.height() - self.height()) // 2)
+        if self.geometry().isEmpty():
+            # الحصول على حجم الشاشة
+            screen = QApplication.primaryScreen().availableGeometry()
+            self.resize(int(screen.width() * 0.9), int(screen.height() * 0.9))
+            self.move((screen.width() - self.width()) // 2, 
+                      (screen.height() - self.height()) // 2)
     
     def _save_window_settings(self):
         """حفظ إعدادات النافذة"""
         try:
-            if self.db_manager and self.db_manager.table_exists('settings'):
-                self.db_manager.execute_update(
-                    """INSERT OR REPLACE INTO settings (setting_key, setting_value, setting_group) 
-                       VALUES (?, ?, ?)""",
-                    ('window_geometry', self.saveGeometry().toHex().decode(), 'window')
-                )
-                self.db_manager.execute_update(
-                    """INSERT OR REPLACE INTO settings (setting_key, setting_value, setting_group) 
-                       VALUES (?, ?, ?)""",
-                    ('window_state', self.saveState().toHex().decode(), 'window')
-                )
+            if self.db_manager:
+                try:
+                    # التحقق من وجود جدول settings
+                    self.db_manager.execute_update(
+                        """INSERT OR REPLACE INTO settings (setting_key, setting_value, setting_group) 
+                           VALUES (?, ?, ?)""",
+                        ('window_geometry', self.saveGeometry().toHex().decode(), 'window')
+                    )
+                    self.db_manager.execute_update(
+                        """INSERT OR REPLACE INTO settings (setting_key, setting_value, setting_group) 
+                           VALUES (?, ?, ?)""",
+                        ('window_state', self.saveState().toHex().decode(), 'window')
+                    )
+                except Exception as e:
+                    print(f"تحذير: لم يتم حفظ إعدادات النافذة - {e}")
         except Exception as e:
             print(f"خطأ في حفظ إعدادات النافذة: {e}")
     
@@ -146,7 +160,8 @@ class MainShell(QMainWindow):
         self._initialize_modules()
         
         # عرض لوحة المعلومات الافتراضية
-        self.show_module('dashboard')
+        if 'dashboard' in self.modules:
+            self.show_module('dashboard')
     
     def _initialize_modules(self):
         """تهيئة جميع وحدات النظام"""
@@ -170,11 +185,12 @@ class MainShell(QMainWindow):
                 if widget:
                     self.modules[key] = widget
                     self.content_stack.addWidget(widget)
-                    print(f"تم تحميل الوحدة: {key}")
+                    print(f"✓ تم تحميل الوحدة: {key}")
                 else:
-                    print(f"فشل تحميل الوحدة: {key}")
+                    print(f"✗ فشل تحميل الوحدة: {key}")
             except Exception as e:
-                print(f"خطأ في تحميل الوحدة {key}: {e}")
+                print(f"✗ خطأ في تحميل الوحدة {key}: {e}")
+                traceback.print_exc()
                 # إنشاء وحدة وهمية
                 placeholder = QLabel(f"⚠️ الوحدة {key} غير متوفرة\n{str(e)}")
                 placeholder.setAlignment(Qt.AlignCenter)
@@ -185,9 +201,10 @@ class MainShell(QMainWindow):
     def _create_module_instance(self, widget_class):
         """إنشاء نسخة من الوحدة مع تمرير المعاملات المناسبة"""
         try:
+            import inspect
+            
             # محاولة تمرير db_manager و currency_manager
             if hasattr(widget_class, '__init__'):
-                import inspect
                 sig = inspect.signature(widget_class.__init__)
                 params = list(sig.parameters.keys())
                 
@@ -269,6 +286,7 @@ class MainShell(QMainWindow):
                     font-weight: bold;
                     text-align: right;
                     padding-right: 15px;
+                    transition: all 0.3s;
                 }}
                 QPushButton:hover {{
                     background-color: {color};
@@ -279,7 +297,8 @@ class MainShell(QMainWindow):
                 }}
             """)
             btn.setCheckable(True)
-            btn.clicked.connect(lambda checked, k=key: self.show_module(k))
+            # تصحيح: lambda مع default argument لتجنب closure issues
+            btn.clicked.connect(lambda checked=False, k=key: self.show_module(k))
             self.nav_buttons[key] = btn
             layout.addWidget(btn)
         
@@ -366,9 +385,10 @@ class MainShell(QMainWindow):
         for btn_key, btn in self.nav_buttons.items():
             btn.setChecked(btn_key == key)
         
-        # عرض الوحدة
+        # عرض الوحدة (آمن - تم التحقق من وجودها)
         widget = self.modules[key]
-        self.content_stack.setCurrentWidget(widget)
+        if widget:
+            self.content_stack.setCurrentWidget(widget)
         
         # تحديث عنوان النافذة
         module_names = {
@@ -391,19 +411,21 @@ class MainShell(QMainWindow):
                 print(f"خطأ في تشغيل on_show للوحدة {key}: {e}")
     
     def apply_current_theme(self):
-        """تطبيق السمة الحالية"""
+        """تطبيق السمة الحالية (تصحيح: بدون تمرير app)"""
         try:
+            # تصحيح: لا نمرر معاملات إضافية
             self.theme_manager.apply_theme(self.theme_manager.current_theme)
         except Exception as e:
             print(f"خطأ في تطبيق السمة: {e}")
     
     def toggle_theme(self):
-        """تبديل السمة (فاتح/داكن/عصري)"""
+        """تبديل السمة (فاتح/داكن/عصري) - تصحيح: بدون تمرير app"""
         current = self.theme_manager.current_theme
         theme_order = {'light': 'dark', 'dark': 'modern', 'modern': 'light'}
         next_theme = theme_order.get(current, 'light')
         
         try:
+            # تصحيح: لا نمرر معاملات إضافية
             self.theme_manager.apply_theme(next_theme)
             
             # تحديث نص الزر
@@ -415,9 +437,10 @@ class MainShell(QMainWindow):
             )
         except Exception as e:
             QMessageBox.warning(self, "خطأ", f"فشل تغيير السمة:\n{str(e)}")
+            traceback.print_exc()
     
     def on_logout(self):
-        """تسجيل الخروج"""
+        """تسجيل الخروج - آمن مع حفظ الإعدادات"""
         reply = QMessageBox.question(
             self, 
             "تأكيد تسجيل الخروج", 
@@ -431,24 +454,28 @@ class MainShell(QMainWindow):
             self.close()
     
     def on_close_event(self, event):
-        """معالج إغلاق النافذة"""
-        # حفظ الإعدادات
-        self._save_window_settings()
-        
-        # إغلاق جميع الاتصالات
-        if hasattr(self, 'timer'):
-            self.timer.stop()
-        
-        # إغلاق الوحدات إذا كانت تدعم الإغلاق
-        for key, widget in self.modules.items():
-            if hasattr(widget, 'on_close'):
-                try:
-                    widget.on_close()
-                except Exception as e:
-                    print(f"خطأ في إغلاق الوحدة {key}: {e}")
-        
-        # قبول الحدث
-        event.accept()
+        """معالج إغلاق النافذة - آمن وسليم"""
+        try:
+            # حفظ الإعدادات
+            self._save_window_settings()
+            
+            # إغلاق جميع الاتصالات
+            if hasattr(self, 'timer') and self.timer.isActive():
+                self.timer.stop()
+            
+            # إغلاق الوحدات إذا كانت تدعم الإغلاق
+            for key, widget in self.modules.items():
+                if widget and hasattr(widget, 'on_close'):
+                    try:
+                        widget.on_close()
+                    except Exception as e:
+                        print(f"خطأ في إغلاق الوحدة {key}: {e}")
+            
+            # قبول الحدث
+            event.accept()
+        except Exception as e:
+            print(f"خطأ في معالج الإغلاق: {e}")
+            event.accept()
     
     def set_user_info(self, username: str, role: str = None):
         """تحديث معلومات المستخدم المعروض"""
@@ -467,13 +494,20 @@ def create_main_shell(db_manager=None, currency_manager=None, theme_manager=None
 
 if __name__ == "__main__":
     # اختبار مستقل
+    import traceback
+    
     app = QApplication(sys.argv)
     
-    # إنشاء مدير قاعدة بيانات تجريبي
-    from core.database.connection import DatabaseManager
-    db = DatabaseManager(":memory:")  # قاعدة بيانات مؤقتة
-    
-    shell = MainShell(db_manager=db)
-    shell.show()
-    
-    sys.exit(app.exec())
+    try:
+        # إنشاء مدير قاعدة بيانات تجريبي
+        from core.database.connection import DatabaseManager
+        db = DatabaseManager(":memory:")  # قاعدة بيانات مؤقتة
+        
+        shell = MainShell(db_manager=db)
+        shell.show()
+        
+        sys.exit(app.exec())
+    except Exception as e:
+        print(f"خطأ في تشغيل التطبيق: {e}")
+        traceback.print_exc()
+        sys.exit(1)
